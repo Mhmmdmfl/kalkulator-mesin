@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalkulator Teknik Mesin</title>
+<meta name="theme-color" content="#1f3a5f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--bg:#eef2f6;--card:#fff;--ink:#14202e;--muted:#5a6b7d;--line:#c9d3de;--main:#1f3a5f;--acc:#f2b705}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1822;--card:#17232f;--ink:#e8eef4;--muted:#93a3b4;--line:#2c3b4a;--main:#7fb0e6;--acc:#f2b705}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.4rem;margin:8px 0 2px}
+.sub{color:var(--muted);margin:0 0 18px;font-size:.9rem}
+label{display:block;font-weight:600;font-size:.9rem;margin:14px 0 6px}
+select,input{width:100%;padding:12px;font-size:1rem;border:1.5px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+select:focus,input:focus{outline:3px solid var(--acc);outline-offset:1px}
+.rumus{margin:14px 0 0;padding:10px 12px;border-left:4px solid var(--acc);background:var(--card);font-family:Georgia,serif;font-size:1.1rem}
+.hasil{margin-top:18px;background:var(--main);color:#fff;border-radius:6px;padding:14px 16px;min-height:64px}
+@media (prefers-color-scheme:dark){.hasil{color:#0f1822}}
+.hasil div{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
+.hasil b{font-size:1.15rem;text-align:right}
+.hasil .err{color:#ffd9d4}
+.catatan{margin-top:22px;font-size:.8rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Kalkulator Teknik Mesin</h1>
+<p class="sub">Rumus dasar. Hasil dihitung otomatis saat kamu mengetik.</p>
+<label for="menu">Pilih perhitungan</label>
+<select id="menu"></select>
+<div class="rumus" id="rumus"></div>
+<div id="inputs"></div>
+<div class="hasil" id="hasil" aria-live="polite"></div>
+<p class="catatan">Hanya perhitungan dasar, bukan pengganti perhitungan desain resmi. Pastikan satuan konsisten dan perhatikan faktor keamanan.</p>
+</main>
+<script>
+const PI=Math.PI,G=9.81;
+const M=[
+{n:"Tegangan normal",f:"σ = F / A",i:[["F","Gaya F (N)"],["A","Luas penampang A (mm²)"]],
+ r:v=>v.A===0?"Luas tidak boleh 0":[["Tegangan",v.F/v.A,"MPa"]]},
+{n:"Regangan",f:"ε = ΔL / L₀",i:[["dL","Pertambahan panjang ΔL (mm)"],["L0","Panjang awal L₀ (mm)"]],
+ r:v=>v.L0===0?"L₀ tidak boleh 0":[["Regangan",v.dL/v.L0,""],["Regangan",v.dL/v.L0*100,"%"]]},
+{n:"Tegangan dari Modulus Young",f:"σ = E × ε",i:[["E","Modulus Young E (MPa), baja ≈ 200000"],["e","Regangan ε"]],
+ r:v=>[["Tegangan",v.E*v.e,"MPa"]]},
+{n:"Torsi / momen",f:"T = F × d",i:[["F","Gaya F (N)"],["d","Jarak lengan d (m)"]],
+ r:v=>[["Torsi",v.F*v.d,"N·m"]]},
+{n:"Daya poros",f:"P = T × ω",i:[["T","Torsi T (N·m)"],["n","Putaran n (rpm)"]],
+ r:v=>{const w=2*PI*v.n/60;return[["Kecepatan sudut",w,"rad/s"],["Daya",v.T*w,"W"],["Daya",v.T*w/1000,"kW"]]}},
+{n:"Gaya",f:"F = m × a",i:[["m","Massa m (kg)"],["a","Percepatan a (m/s²), gravitasi 9,81"]],
+ r:v=>[["Gaya",v.m*v.a,"N"]]},
+{n:"Tekanan hidrostatis",f:"P = ρ × g × h",i:[["rho","Massa jenis ρ (kg/m³), air 1000"],["h","Kedalaman h (m)"]],
+ r:v=>[["Tekanan",v.rho*G*v.h,"Pa"],["Tekanan",v.rho*G*v.h/1000,"kPa"]]},
+{n:"Debit aliran",f:"Q = A × v",i:[["A","Luas penampang A (m²)"],["v","Kecepatan aliran v (m/s)"]],
+ r:v=>[["Debit",v.A*v.v,"m³/s"],["Debit",v.A*v.v*1000,"L/s"]]},
+{n:"Momen inersia persegi panjang",f:"I = b × h³ / 12",i:[["b","Lebar b (mm)"],["h","Tinggi h (mm)"]],
+ r:v=>[["Momen inersia",v.b*v.h**3/12,"mm⁴"]]},
+{n:"Efisiensi",f:"η = W / Q × 100%",i:[["W","Energi berguna W"],["Q","Energi masuk Q (satuan sama)"]],
+ r:v=>v.Q===0?"Q tidak boleh 0":[["Efisiensi",v.W/v.Q*100,"%"]]}
+];
+const $=id=>document.getElementById(id);
+const fmt=x=>x.toLocaleString("id-ID",{maximumFractionDigits:6});
+M.forEach((m,k)=>$("menu").add(new Option(m.n,k)));
+function build(){
+  const m=M[$("menu").value];
+  $("rumus").textContent=m.f;
+  $("inputs").innerHTML=m.i.map(([id,t])=>
+    `<label for="f_${id}">${t}</label><input id="f_${id}" type="number" step="any" inputmode="decimal">`).join("");
+  m.i.forEach(([id])=>$("f_"+id).addEventListener("input",hitung));
+  hitung();
+}
+function hitung(){
+  const m=M[$("menu").value],v={};let ok=true;
+  m.i.forEach(([id])=>{const s=$("f_"+id).value;if(s==="")ok=false;v[id]=parseFloat(s)});
+  const out=$("hasil");
+  if(!ok){out.innerHTML="<div>Isi semua kolom untuk melihat hasil.</div>";return}
+  const r=m.r(v);
+  out.innerHTML=typeof r==="string"?`<div class="err">${r}</div>`
+    :r.map(([l,x,u])=>`<div><span>${l}</span><b>${fmt(x)} ${u}</b></div>`).join("");
+}
+$("menu").addEventListener("change",build);
+build();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
